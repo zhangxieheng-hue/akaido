@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AKAIDO Sales System V1.2</title>
+<style>
+:root{--blue:#143d8d;--blue2:#0c2f73;--bg:#f4f7fb;--card:#fff;--text:#172033;--muted:#6b7280;--line:#e5eaf2;--green:#198754;--orange:#f59e0b;--red:#dc3545}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text)}
+header{background:linear-gradient(135deg,var(--blue2),var(--blue));color:white;padding:18px 20px;position:sticky;top:0;z-index:10;box-shadow:0 2px 12px #0002}
+header .top{display:flex;justify-content:space-between;align-items:center;gap:10px}h1{font-size:20px;margin:0}small{opacity:.8}
+.container{max-width:1200px;margin:auto;padding:18px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 2px 8px #1020400a}.kpi b{font-size:28px;display:block;margin-top:7px}.muted{color:var(--muted);font-size:13px}
+nav{display:flex;gap:8px;overflow:auto;margin:0 0 16px;padding-bottom:2px}button{border:0;border-radius:9px;padding:10px 14px;background:var(--blue);color:#fff;font-weight:600;cursor:pointer}button.secondary{background:#eef3fb;color:var(--blue)}button.danger{background:var(--red)}button.green{background:var(--green)}button:disabled{opacity:.5;cursor:not-allowed}
+.section{display:none}.section.active{display:block}.row{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.field{margin-bottom:12px}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}.field input,.field select,.field textarea{width:100%;padding:11px;border:1px solid #d8deea;border-radius:9px;background:white;font-size:14px}.field textarea{min-height:85px;resize:vertical}
+table{width:100%;border-collapse:collapse}th,td{padding:11px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}th{color:var(--muted);font-size:12px}.tag{display:inline-block;padding:4px 8px;border-radius:20px;font-size:11px;font-weight:700}.A{background:#e7f7ed;color:#137333}.B{background:#fff4d8;color:#9a6700}.C{background:#edf0f5;color:#566070}.dangerTag{background:#ffe5e5;color:#b42318}.greenTag{background:#e5f7ee;color:#087443}
+.login{min-height:100vh;display:grid;place-items:center;background:linear-gradient(135deg,#09235b,#174aa5)}.loginbox{width:min(420px,92%);background:white;border-radius:18px;padding:28px;box-shadow:0 18px 50px #0004}.logo{font-weight:900;color:var(--blue);font-size:28px;letter-spacing:1px}
+.toast{position:fixed;right:18px;bottom:18px;background:#172033;color:white;padding:12px 15px;border-radius:10px;display:none;z-index:99}
+.mapbox{height:280px;border-radius:12px;background:repeating-linear-gradient(45deg,#eef3f9,#eef3f9 12px,#e7edf5 12px,#e7edf5 24px);display:grid;place-items:center;color:var(--muted);text-align:center}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.photo{max-width:180px;border-radius:10px;margin-top:8px}
+@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.row{grid-template-columns:1fr}table{display:block;overflow:auto;white-space:nowrap}.container{padding:12px}}
+@media(max-width:480px){.grid{grid-template-columns:1fr 1fr}.kpi b{font-size:22px}button{padding:9px 11px}}
+</style>
+</head>
+<body>
+<div id="login" class="login">
+  <div class="loginbox">
+    <div class="logo">AKAIDO</div>
+    <p><b>Sales Management System V1.2</b></p>
+    <p class="muted">销售人员打卡 · 客户CRM · 拜访记录 · 客户分析</p>
+    <div class="field"><label>员工姓名</label><input id="loginName" placeholder="例如：Desmond" autocomplete="username"></div>
+    <div class="field"><label>密码</label><input id="loginPass" type="password" value="123456" autocomplete="current-password"></div>
+    <button id="loginBtn" style="width:100%" type="button">登录</button>
+    <p class="muted" style="margin-top:12px">V1.2 Demo：统一密码 123456。正式版建议改为个人密码。</p>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+<header><div class="top"><div><h1>AKAIDO SALES SYSTEM</h1><small id="who"></small></div><button class="secondary" onclick="logout()">退出</button></div></header>
+<div class="container">
+<nav>
+<button onclick="show('dashboard')">📊 Dashboard</button>
+<button onclick="show('checkin')">📍 打卡</button>
+<button onclick="show('customers')">👥 客户</button>
+<button onclick="show('visit')">📝 拜访</button>
+<button onclick="show('analysis')">📈 分析</button>
+<button onclick="show('staff')">👨‍💼 员工</button>
+</nav>
+
+<section id="dashboard" class="section active">
+<div class="grid">
+<div class="card kpi"><div class="muted">今日拜访</div><b id="kVisits">0</b></div>
+<div class="card kpi"><div class="muted">客户总数</div><b id="kCustomers">0</b></div>
+<div class="card kpi"><div class="muted">待跟进</div><b id="kFollow">0</b></div>
+<div class="card kpi"><div class="muted">潜在订单</div><b id="kPotential">RM 0</b></div>
+</div>
+<div class="row" style="margin-top:14px">
+<div class="card"><h3>快速打卡</h3><p class="muted">到达客户现场后，开启GPS并记录位置。</p><div class="actions"><button onclick="show('checkin')">📍 进入打卡</button><button class="secondary" onclick="show('customers')">客户资料</button></div><p id="gpsStatus" class="muted"></p></div>
+<div class="card"><h3>客户状态</h3><div id="statusSummary"></div></div>
+</div>
+<div class="card" style="margin-top:14px"><h3>最近拜访</h3><div id="recentVisits"></div></div>
+</section>
+
+<section id="checkin" class="section">
+<div class="card"><h2>📍 GPS 打卡</h2><p class="muted">系统会记录浏览器提供的GPS坐标与精度。正式版可加入客户范围验证。</p>
+<div class="row"><div>
+<div class="field"><label>选择客户</label><select id="checkCustomer"></select></div>
+<div class="actions"><button onclick="getGPS()">获取当前位置</button><button class="green" onclick="checkIn()">开始拜访 / Check-in</button><button class="danger" onclick="checkOut()">结束拜访 / Check-out</button></div>
+</div><div class="card" style="background:#f8fafc"><b>当前定位</b><p id="locText" class="muted">尚未获取</p></div></div></div>
+</section>
+
+<section id="customers" class="section">
+<div class="card"><div class="top" style="color:var(--text)"><h2>👥 客户 CRM</h2><button onclick="openCustomerForm()">＋ 新增客户</button></div>
+<div class="field"><input id="search" placeholder="搜索客户名称 / 联系人 / 电话" oninput="renderCustomers()"></div>
+<div id="customerTable"></div></div>
+<div id="customerForm" class="card" style="display:none;margin-top:14px"><h3>新增客户</h3>
+<div class="row">
+<div class="field"><label>客户名称 *</label><input id="cName"></div>
+<div class="field"><label>联系人</label><input id="cContact"></div>
+<div class="field"><label>电话</label><input id="cPhone"></div>
+<div class="field"><label>客户等级</label><select id="cGrade"><option>A</option><option>B</option><option>C</option></select></div>
+<div class="field"><label>地址</label><input id="cAddress"></div>
+<div class="field"><label>主要产品</label><input id="cProducts" placeholder="例如：Impact Drill / Grinder"></div>
+<div class="field"><label>竞争品牌</label><input id="cCompetitor"></div>
+<div class="field"><label>备注</label><textarea id="cRemarks"></textarea></div>
+</div><div class="actions"><button onclick="saveCustomer()">保存客户</button><button class="secondary" onclick="closeCustomerForm()">取消</button></div></div>
+</section>
+
+<section id="visit" class="section">
+<div class="card"><h2>📝 拜访报告</h2>
+<div class="row">
+<div class="field"><label>客户</label><select id="vCustomer"></select></div>
+<div class="field"><label>是否见到老板/负责人</label><select id="vOwner"><option>是</option><option>否</option></select></div>
+<div class="field"><label>客户需求</label><textarea id="vNeed" placeholder="客户需要什么？"></textarea></div>
+<div class="field"><label>客户反馈</label><textarea id="vFeedback"></textarea></div>
+<div class="field"><label>竞争品牌/价格</label><textarea id="vComp"></textarea></div>
+<div class="field"><label>潜在订单 RM</label><input id="vPotential" type="number" min="0" value="0"></div>
+<div class="field"><label>下次跟进日期</label><input id="vFollow" type="date"></div>
+<div class="field"><label>现场照片</label><input id="vPhoto" type="file" accept="image/*" capture="environment"></div>
+</div><button onclick="saveVisit()">提交拜访报告</button></div>
+</section>
+
+<section id="analysis" class="section">
+<div class="card"><h2>📈 客户分析</h2><p class="muted">V1.2 使用规则分析：结合客户等级、潜在订单、拜访及跟进日期自动分类。</p><div id="analysisTable"></div></div>
+</section>
+
+<section id="staff" class="section">
+<div class="card"><h2>👨‍💼 员工表现</h2><p class="muted">当前为单机Demo；正式云端版可按账号统计每位销售。</p><div id="staffTable"></div></div>
+</section>
+</div></div>
+<div id="toast" class="toast"></div>
+
+<script>
+const PASS="123456";
+let state;
+try{
+  state=JSON.parse(localStorage.getItem("akaido_v12")||'{"users":[],"customers":[],"visits":[],"attendance":[]}');
+  if(!state || typeof state!=="object") throw new Error("bad data");
+}catch(e){
+  state={users:[],customers:[],visits:[],attendance:[]};
+  try{localStorage.removeItem("akaido_v12")}catch(x){}
+}
+let currentUser=localStorage.getItem("akaido_user")||"";
+let gps={lat:null,lng:null,accuracy:null};
+let currentCheckin=null;
+
+function save(){localStorage.setItem("akaido_v12",JSON.stringify(state));}
+function toast(s){let t=document.getElementById("toast");t.textContent=s;t.style.display="block";setTimeout(()=>t.style.display="none",2200)}
+function login(){
+  try{
+    const n=document.getElementById("loginName").value.trim();
+    const p=document.getElementById("loginPass").value;
+    if(!n){toast("请输入员工姓名");document.getElementById("loginName").focus();return;}
+    if(p!=="123456"){toast("密码错误，请输入 123456");document.getElementById("loginPass").focus();return;}
+    currentUser=n;
+    try{localStorage.setItem("akaido_user",n);}catch(e){}
+    if(!Array.isArray(state.users)) state.users=[];
+    if(!state.users.find(x=>x.name===n)) state.users.push({name:n,role:"sales"});
+    save();
+    document.getElementById("login").style.display="none";
+    document.getElementById("app").style.display="block";
+    document.getElementById("who").textContent=n+" · Sales";
+    refresh();
+    toast("登录成功");
+  }catch(e){
+    console.error(e);
+    toast("系统初始化失败，请重新打开页面");
+  }
+}
+function logout(){localStorage.removeItem("akaido_user");location.reload()}
+function show(id){document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");refresh();}
+function refresh(){renderSelects();renderCustomers();renderDashboard();renderAnalysis();renderStaff();}
+function openCustomerForm(){document.getElementById("customerForm").style.display="block"}
+function closeCustomerForm(){document.getElementById("customerForm").style.display="none"}
+function saveCustomer(){
+ let name=cName.value.trim(); if(!name)return toast("客户名称不能为空");
+ state.customers.push({id:Date.now(),name,contact:cContact.value,phone:cPhone.value,grade:cGrade.value,address:cAddress.value,products:cProducts.value,competitor:cCompetitor.value,remarks:cRemarks.value,owner:currentUser,createdAt:new Date().toISOString()});
+ save();closeCustomerForm();["cName","cContact","cPhone","cAddress","cProducts","cCompetitor","cRemarks"].forEach(id=>document.getElementById(id).value="");toast("客户已保存");refresh();
+}
+function renderSelects(){
+ let opts='<option value="">请选择客户</option>'+state.customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("");
+ checkCustomer.innerHTML=opts;vCustomer.innerHTML=opts;
+}
+function renderCustomers(){
+ let q=(document.getElementById("search")?.value||"").toLowerCase();
+ let arr=state.customers.filter(c=>[c.name,c.contact,c.phone,c.address].join(" ").toLowerCase().includes(q));
+ if(!arr.length){customerTable.innerHTML='<p class="muted">暂无客户。点击“新增客户”建立CRM。</p>';return}
+ customerTable.innerHTML='<table><thead><tr><th>客户</th><th>联系人</th><th>等级</th><th>竞争品牌</th><th>销售</th><th>操作</th></tr></thead><tbody>'+arr.map(c=>`<tr><td><b>${esc(c.name)}</b><br><span class="muted">${esc(c.phone||"")}</span></td><td>${esc(c.contact||"-")}</td><td><span class="tag ${c.grade}">${c.grade}</span></td><td>${esc(c.competitor||"-")}</td><td>${esc(c.owner||"-")}</td><td><button class="secondary" onclick="quickVisit(${c.id})">拜访</button></td></tr>`).join("")+'</tbody></table>';
+}
+function quickVisit(id){show("visit");setTimeout(()=>vCustomer.value=id,50)}
+function getGPS(){
+ if(!navigator.geolocation)return toast("浏览器不支持GPS");
+ navigator.geolocation.getCurrentPosition(pos=>{gps={lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:Math.round(pos.coords.accuracy)};locText.textContent=`纬度 ${gps.lat.toFixed(6)} · 经度 ${gps.lng.toFixed(6)} · 精度约 ${gps.accuracy}m`;gpsStatus.textContent="GPS 已获取";toast("GPS定位成功")},e=>toast("无法取得GPS："+e.message),{enableHighAccuracy:true,timeout:10000,maximumAge:0});
+}
+function checkIn(){
+ if(!vOrCheckCustomer())return;if(gps.lat===null)return toast("请先获取当前位置");
+ currentCheckin={customerId:+checkCustomer.value,start:new Date().toISOString(),lat:gps.lat,lng:gps.lng,accuracy:gps.accuracy};
+ state.attendance.push({type:"IN",user:currentUser,time:currentCheckin.start,customerId:currentCheckin.customerId,...gps});save();toast("Check-in成功");
+}
+function checkOut(){
+ if(!currentCheckin)return toast("没有进行中的拜访");
+ let now=new Date().toISOString();state.attendance.push({type:"OUT",user:currentUser,time:now,customerId:currentCheckin.customerId,...gps});save();currentCheckin=null;toast("Check-out成功");
+}
+function vOrCheckCustomer(){if(!checkCustomer.value)return toast("请选择客户"),false;return true}
+function saveVisit(){
+ if(!vCustomer.value)return toast("请选择客户");
+ let file=vPhoto.files[0], reader=null;
+ const commit=(photo)=>{state.visits.push({id:Date.now(),customerId:+vCustomer.value,user:currentUser,time:new Date().toISOString(),owner:vOwner.value,need:vNeed.value,feedback:vFeedback.value,competitor:vComp.value,potential:+vPotential.value||0,follow:vFollow.value,photo:photo||""});save();toast("拜访报告已提交");vNeed.value=vFeedback.value=vComp.value="";vPotential.value=0;vFollow.value="";vPhoto.value="";refresh();}
+ if(file){reader=new FileReader();reader.onload=()=>commit(reader.result);reader.readAsDataURL(file)}else commit("");
+}
+function renderDashboard(){
+ let today=new Date().toISOString().slice(0,10);
+ kVisits.textContent=state.visits.filter(v=>v.time.slice(0,10)===today).length;
+ kCustomers.textContent=state.customers.length;
+ kFollow.textContent=state.visits.filter(v=>v.follow && v.follow<=today).length;
+ kPotential.textContent="RM "+state.visits.reduce((a,v)=>a+(+v.potential||0),0).toLocaleString();
+ let counts={A:0,B:0,C:0};state.customers.forEach(c=>counts[c.grade]=(counts[c.grade]||0)+1);
+ statusSummary.innerHTML=`A级 ${counts.A||0}　 B级 ${counts.B||0}　 C级 ${counts.C||0}`;
+ let recent=[...state.visits].reverse().slice(0,8);
+ recentVisits.innerHTML=recent.length?'<table><tr><th>时间</th><th>客户</th><th>销售</th><th>潜在订单</th><th>跟进</th></tr>'+recent.map(v=>{let c=state.customers.find(x=>x.id===v.customerId);return `<tr><td>${fmt(v.time)}</td><td>${esc(c?.name||"-")}</td><td>${esc(v.user)}</td><td>RM ${(v.potential||0).toLocaleString()}</td><td>${v.follow||"-"}</td></tr>`}).join("")+'</table>':'<p class="muted">暂无拜访记录</p>';
+}
+function classify(c){
+ let vs=state.visits.filter(v=>v.customerId===c.id), last=vs.length?vs.reduce((a,b)=>a.time>b.time?a:b):null;
+ let potential=vs.reduce((s,v)=>s+(+v.potential||0),0), today=new Date().toISOString().slice(0,10);
+ if(vs.some(v=>v.follow&&v.follow<=today))return ["Follow Up","dangerTag"];
+ if(c.grade==="A"||potential>=10000)return ["High Potential","greenTag"];
+ if(last)return ["Active","A"];
+ return ["New / No Visit","C"];
+}
+function renderAnalysis(){
+ if(!state.customers.length){analysisTable.innerHTML='<p class="muted">暂无数据</p>';return}
+ analysisTable.innerHTML='<table><thead><tr><th>客户</th><th>等级</th><th>拜访次数</th><th>潜在订单</th><th>分析状态</th><th>最近拜访</th></tr></thead><tbody>'+state.customers.map(c=>{let vs=state.visits.filter(v=>v.customerId===c.id),p=vs.reduce((s,v)=>s+(+v.potential||0),0),last=vs.length?vs.reduce((a,b)=>a.time>b.time?a:b):null,cl=classify(c);return `<tr><td><b>${esc(c.name)}</b></td><td><span class="tag ${c.grade}">${c.grade}</span></td><td>${vs.length}</td><td>RM ${p.toLocaleString()}</td><td><span class="tag ${cl[1]}">${cl[0]}</span></td><td>${last?fmt(last.time):"-"}</td></tr>`}).join("")+'</tbody></table>';
+}
+function renderStaff(){
+ let names=[...new Set(state.users.map(u=>u.name).concat(state.visits.map(v=>v.user)))];
+ staffTable.innerHTML=names.length?'<table><tr><th>销售</th><th>拜访</th><th>潜在订单</th><th>最后拜访</th></tr>'+names.map(n=>{let vs=state.visits.filter(v=>v.user===n),p=vs.reduce((s,v)=>s+(+v.potential||0),0),last=vs.length?vs.reduce((a,b)=>a.time>b.time?a:b):null;return `<tr><td><b>${esc(n)}</b></td><td>${vs.length}</td><td>RM ${p.toLocaleString()}</td><td>${last?fmt(last.time):"-"}</td></tr>`}).join("")+'</table>':'<p class="muted">暂无员工数据</p>';
+}
+function fmt(x){return new Date(x).toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})}
+function esc(x){return String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+if(currentUser){document.getElementById("login").style.display="none";document.getElementById("app").style.display="block";document.getElementById("who").textContent=currentUser+" · Sales";refresh()}
+
+document.getElementById("loginBtn").addEventListener("click",login);
+document.getElementById("loginPass").addEventListener("keydown",function(e){if(e.key==="Enter")login()});
+document.getElementById("loginName").addEventListener("keydown",function(e){if(e.key==="Enter")document.getElementById("loginPass").focus()});
+</script>
+</body>
+</html>
