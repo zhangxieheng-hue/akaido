@@ -247,18 +247,27 @@ function getPos(timeout){
   });
 }
 function geoMsg(e){return e&&e.code===1?'请允许网页使用定位权限':e&&e.code===2?'无法确定位置，请到信号好的地方重试':e&&e.code===3?'定位超时，请重试':'此浏览器不支持定位（需要 HTTPS 网址）'}
+let ckDate=ymd();
+function onDate(x,d){return ymd(new Date(x))===d}
+function filterCheckin(){ckDate=$('ckDate').value||ymd();renderCheckinBody()}
 function renderCheckin(){
-  const mine=D.attendance.filter(a=>a.user_id===me.id&&isToday(a.created_at));
-  const hasIn=mine.some(a=>a.type==='IN');
-  let h='<h2>📍 外勤打卡</h2><div class="card"><div class="row"><button class="btn" onclick="attend(\'IN\')">📍 CHECK IN</button><button class="btn secondary" onclick="attend(\'OUT\')">🏁 CHECK OUT</button></div>'+
-    '<p class="muted">今日状态：'+(hasIn?'已 Check In':'尚未 Check In')+'。打卡会记录 GPS 位置，请在弹出的提示里选择「允许」。</p></div>';
-  h+='<div class="card"><h3>我的今日记录</h3>'+(mine.length?mine.map(a=>
-    '<div class="item"><b>'+esc(a.type)+'</b> · '+fmt(a.created_at)+'<br><small>GPS '+gpsText(a.lat,a.lng)+' · 精度 '+(a.accuracy!=null?Math.round(a.accuracy)+'m':'-')+' · '+mapLink(a.lat,a.lng)+'</small></div>').join(''):'<div class="muted">今天还没有打卡记录</div>')+'</div>';
+  $('checkin').innerHTML='<h2>📍 外勤打卡</h2><div class="card"><div class="row"><button class="btn" onclick="attend(\'IN\')">📍 CHECK IN</button><button class="btn secondary" onclick="attend(\'OUT\')">🏁 CHECK OUT</button></div>'+
+    '<p class="muted">今日状态：'+(D.attendance.some(a=>a.user_id===me.id&&a.type==='IN'&&isToday(a.created_at))?'已 Check In':'尚未 Check In')+'。打卡会记录 GPS 位置，请在弹出的提示里选择「允许」。</p></div>'+
+    '<div class="card"><div class="row between"><h3 style="margin:0">查看日期</h3><input id="ckDate" type="date" style="width:auto;margin:0" max="'+ymd()+'" value="'+ckDate+'" onchange="filterCheckin()"></div></div>'+
+    '<div id="ckBody"></div>';
+  renderCheckinBody();
+}
+function renderCheckinBody(){
+  const d=ckDate,label=d===ymd()?'今天':d;
+  const mine=D.attendance.filter(a=>a.user_id===me.id&&onDate(a.created_at,d));
+  let h='<div class="card"><h3>我的记录（'+esc(label)+'）</h3>'+(mine.length?mine.map(a=>
+    '<div class="item"><b>'+esc(a.type)+'</b> · '+fmt(a.created_at)+'<br><small>GPS '+gpsText(a.lat,a.lng)+' · 精度 '+(a.accuracy!=null?Math.round(a.accuracy)+'m':'-')+' · '+mapLink(a.lat,a.lng)+'</small></div>').join(''):'<div class="muted">这一天没有打卡记录</div>')+'</div>';
   if(isAdmin()){
-    h+='<div class="card"><h3>全部 Sales 打卡记录（最近 100 条）</h3><div class="table"><table><tr><th>Sales</th><th>类型</th><th>时间</th><th>位置</th><th>精度</th></tr>'+
-      D.attendance.slice(0,100).map(a=>'<tr><td>'+esc(nameOf(a.user_id))+'</td><td>'+esc(a.type)+'</td><td>'+fmt(a.created_at)+'</td><td>'+mapLink(a.lat,a.lng)+'</td><td>'+(a.accuracy!=null?Math.round(a.accuracy)+'m':'-')+'</td></tr>').join('')+'</table></div></div>';
+    const list=D.attendance.filter(a=>onDate(a.created_at,d));
+    h+='<div class="card"><h3>全部 Sales 打卡记录（'+esc(label)+'）</h3><div class="table"><table><tr><th>Sales</th><th>类型</th><th>时间</th><th>位置</th><th>精度</th></tr>'+
+      (list.length?list.map(a=>'<tr><td>'+esc(nameOf(a.user_id))+'</td><td>'+esc(a.type)+'</td><td>'+fmt(a.created_at)+'</td><td>'+mapLink(a.lat,a.lng)+'</td><td>'+(a.accuracy!=null?Math.round(a.accuracy)+'m':'-')+'</td></tr>').join(''):'<tr><td colspan="5" class="muted">这一天没有记录</td></tr>')+'</table></div></div>';
   }
-  $('checkin').innerHTML=h;
+  $('ckBody').innerHTML=h;
 }
 async function attend(type){
   await guard(async()=>{
