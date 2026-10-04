@@ -169,6 +169,16 @@ async function logout(){me=null;try{await sb.auth.signOut()}catch(e){}location.r
 async function refresh(){await guard(async()=>{await loadAll();page(cur);toast('已刷新')})}
 
 /* ========== 读取数据（数据库 RLS 已按账号过滤：Sales 只会拿到自己的，Admin 拿到全部） ========== */
+let cardUrls={};
+const cardSrc=p=>p?(cardUrls[p]||null):null;
+async function loadCardUrls(customers){
+  const paths=[...new Set(customers.map(c=>c.card_photo).filter(Boolean))];
+  if(!paths.length){cardUrls={};return}
+  const {data,error}=await sb.storage.from('business-cards').createSignedUrls(paths,3600);
+  const next={};
+  if(!error&&data)data.forEach(d=>{if(d&&d.path&&d.signedUrl)next[d.path]=d.signedUrl});
+  cardUrls=next;
+}
 async function loadAll(){
   const rs=await Promise.all([
     sb.from('profiles').select('*').order('username'),
@@ -178,6 +188,7 @@ async function loadAll(){
   ]);
   for(const r of rs){if(r.error)throw r.error}
   D={profiles:rs[0].data,customers:rs[1].data,visits:rs[2].data,attendance:rs[3].data};
+  await loadCardUrls(D.customers);
 }
 
 /* ========== 页面切换 ========== */
@@ -296,7 +307,7 @@ function custList(q){
     const overdue=c.follow_up&&c.follow_up<=today;
     return '<div class="item"><div class="row between"><b>'+esc(c.name)+'</b><span class="badge g-'+esc(c.grade)+'">'+esc(c.grade)+' 级</span></div>'+
       '<small>'+esc(c.contact||'-')+' · '+esc(c.phone||'-')+'</small><br><small>'+esc(c.address||'-')+'</small>'+
-      '<div class="muted" style="margin-top:4px">'+(admin?'Sales：'+esc(nameOf(c.owner_id))+' · ':'')+'下次跟进：<span class="'+(overdue?'red':'')+'">'+esc(c.follow_up||'-')+'</span> · 潜在订单 '+money(pm.get(c.id)||0)+(c.card_photo?' · <a target="_blank" rel="noopener" href="'+esc(c.card_photo)+'">名片</a>':'')+'</div>'+
+      '<div class="muted" style="margin-top:4px">'+(admin?'Sales：'+esc(nameOf(c.owner_id))+' · ':'')+'下次跟进：<span class="'+(overdue?'red':'')+'">'+esc(c.follow_up||'-')+'</span> · 潜在订单 '+money(pm.get(c.id)||0)+(c.card_photo?(cardSrc(c.card_photo)?' · <a target="_blank" rel="noopener" href="'+esc(cardSrc(c.card_photo))+'">名片</a>':' · 名片（加载中，点刷新）'):'')+'</div>'+
       '<div class="row" style="margin-top:8px"><button class="btn secondary" onclick="showCustomer(\''+esc(c.id)+'\')">详情/历史</button><button class="btn secondary" onclick="customerForm(\''+esc(c.id)+'\')">编辑</button><button class="btn" onclick="visitForm(\''+esc(c.id)+'\')">拜访</button></div></div>';
   }).join('');
 }
@@ -314,19 +325,21 @@ function showCustomer(id){
   $('customers').innerHTML='<h2>👥 '+esc(c.name)+'</h2>'+
    '<div class="card"><div class="row between"><span class="badge g-'+esc(c.grade)+'">'+esc(c.grade)+' 级</span><span class="muted">'+(isAdmin()?'Sales：'+esc(nameOf(c.owner_id)):'')+'</span></div>'+
    '<p>联系人：'+esc(c.contact||'-')+'<br>电话：'+esc(c.phone||'-')+'<br>地址：'+esc(c.address||'-')+'<br>竞品：'+esc(c.competitor||'-')+'<br>产品：'+esc(c.products||'-')+'<br>下次跟进：'+esc(c.follow_up||'-')+'<br>潜在订单：'+money(pm.get(c.id)||0)+'<br>备注：'+esc(c.remarks||'-')+'</p>'+
-   (c.card_photo?'<img src="'+esc(c.card_photo)+'" alt="名片" style="max-width:240px;width:100%;border-radius:10px;border:1px solid #e5e7eb;display:block;margin-top:4px">':'')+
+   (c.card_photo?(cardSrc(c.card_photo)?'<img src="'+esc(cardSrc(c.card_photo))+'" alt="名片" style="max-width:240px;width:100%;border-radius:10px;border:1px solid #e5e7eb;display:block;margin-top:4px">':'<p class="muted">名片图片加载中，请点右上角「↻ 刷新」</p>'):'')+
    '<div class="row"><button class="btn" onclick="visitForm(\''+esc(c.id)+'\')">＋ 新增拜访</button><button class="btn secondary" onclick="customerForm(\''+esc(c.id)+'\')">编辑</button><button class="btn secondary" onclick="renderCustomers()">返回列表</button></div></div>'+
    '<div class="card"><h3>拜访历史（'+vs.length+'）</h3>'+(vs.length?vs.map(v=>visitItem(v,false)).join(''):'<div class="muted">还没有拜访记录</div>')+'</div>';
 }
-let cardUrl=null;
+let cardPath=null;    // 存进 customers.card_photo 的值：Storage 里的路径（私密桶，没有公开链接）
+let cardPreview=null; // 仅用于表单里即时预览的临时签名链接，不会存进数据库
 function renderCardPreview(){
   const box=$('cardPreview');if(!box)return;
-  box.innerHTML=cardUrl?
-    ('<img src="'+esc(cardUrl)+'" alt="名片" style="max-width:200px;max-height:200px;object-fit:cover;border-radius:10px;border:1px solid #e5e7eb;display:block;margin-bottom:8px">'+
+  box.innerHTML=cardPreview?
+    ('<img src="'+esc(cardPreview)+'" alt="名片" style="max-width:200px;max-height:200px;object-fit:cover;border-radius:10px;border:1px solid #e5e7eb;display:block;margin-bottom:8px">'+
      '<button type="button" class="btn secondary" style="margin-bottom:8px" onclick="removeCard()">移除照片</button>')
-    :'<div class="muted" style="margin-bottom:8px">还没有上传名片照片</div>';
+    :(cardPath?'<div class="muted" style="margin-bottom:8px">已有名片照片（预览生成中或刷新后可见）</div><button type="button" class="btn secondary" style="margin-bottom:8px" onclick="removeCard()">移除照片</button>'
+             :'<div class="muted" style="margin-bottom:8px">还没有上传名片照片</div>');
 }
-function removeCard(){cardUrl=null;renderCardPreview()}
+function removeCard(){cardPath=null;cardPreview=null;renderCardPreview()}
 async function uploadCard(file){
   if(!file)return;
   if(!/^image\//.test(file.type||'')){toast('请选择图片文件');return}
@@ -337,8 +350,9 @@ async function uploadCard(file){
     const path='cards/'+me.id+'/'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.'+ext;
     const up=await sb.storage.from('business-cards').upload(path,file,{upsert:true,contentType:file.type||'image/jpeg'});
     if(up.error)throw up.error;
-    const pub=sb.storage.from('business-cards').getPublicUrl(path);
-    cardUrl=pub.data.publicUrl;
+    const signed=await sb.storage.from('business-cards').createSignedUrl(path,3600);
+    cardPath=path;
+    cardPreview=(signed&&signed.data&&signed.data.signedUrl)||null;
     renderCardPreview();
     toast('名片已上传');
   });
@@ -347,7 +361,8 @@ function customerForm(id){
   showSection('customers');
   const c=id?D.customers.find(x=>x.id===id):{name:'',contact:'',phone:'',address:'',grade:'B',competitor:'',products:'',remarks:'',follow_up:'',owner_id:'',card_photo:null};
   if(!c){renderCustomers();return}
-  cardUrl=c.card_photo||null;
+  cardPath=c.card_photo||null;
+  cardPreview=cardPath?cardSrc(cardPath):null;
   const admin=isAdmin();
   let ownerSel='';
   if(admin){
@@ -374,7 +389,7 @@ async function saveCustomer(id){
   const name=$('c_name').value.trim();
   if(!name){toast('请输入客户名称');return}
   const row={name:name,contact:$('c_contact').value.trim(),phone:$('c_phone').value.trim(),grade:$('c_grade').value,address:$('c_addr').value.trim(),
-    competitor:$('c_comp').value.trim(),products:$('c_prod').value.trim(),remarks:$('c_rem').value.trim(),follow_up:$('c_fu').value||null,card_photo:cardUrl};
+    competitor:$('c_comp').value.trim(),products:$('c_prod').value.trim(),remarks:$('c_rem').value.trim(),follow_up:$('c_fu').value||null,card_photo:cardPath};
   if(isAdmin()&&$('c_owner'))row.owner_id=$('c_owner').value;
   await guard(async()=>{
     let r;
